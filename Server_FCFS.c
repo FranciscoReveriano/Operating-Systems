@@ -11,17 +11,25 @@ float throughput;
 float averageTurnAround;
 float averageWaitTime;
 float cpuUtilization;
+int frames = 0;		// Variable for Number of Frames
+int frameSize = 0;	// Variable for Size of Frames
+int Memory = 0;		// Variable for available memory
+int toggle = 0;		// Toggle For Memory check
 
 typedef struct pcb {  /*structure for PCBs */
 	char str[30];
 	int arrivalTime;
 	int burst;
+	int MemoryUnits;
 } PCB;
 
 typedef struct result {
 	int WaitingInReady;
 	int completionTime;
 	int turnAroundTime;
+	int frameAllocated;
+	int fragmentation;
+	int error;
 } Results;
 
 typedef struct node {  /*Nodes stored in the linked list*/
@@ -98,17 +106,11 @@ PCB dequeue(Queue *Q) {
 	}
 
 	oldHead = Q->head;
-
 	temp = Q->head->elements;
-
 	Q->head = Q->head->next;
-
 	free(oldHead);
-
 	Q->sz--;
-
 	return temp;
-
 }
 
 PCB first(Queue *Q) {
@@ -117,8 +119,24 @@ PCB first(Queue *Q) {
 		printf("ERROR: Queue is empty\n");
 		return temp;
 	}
-
 	printf("Head of the list is:%s\n", Q->head->elements.str);
+}
+
+PCB firstMemory(Queue *Q) {
+	PCB temp;
+	int tempMemory;
+	if (isEmpty(Q)) {
+		printf("ERROR: Queue is empty\n");
+		return temp;
+	}
+	printf("Head of the list is:%s\n", Q->head->elements.str);
+	tempMemory = Q->head->elements.MemoryUnits;					// Make Variable hold the memory units required in head
+	if (tempMemory > Memory) {
+		toggle = 1;
+	}
+	else {
+		toggle = 0;
+	}
 
 }
 
@@ -131,13 +149,25 @@ void destroyQueue(Queue *Q) {
 /*A different visit function must be used for each different datatype.*/
 /*The name of the appropriate visit function is passed as an argument */
 /*to traverseQueue.                                                   */
-
 void visitNode(PCB elements) {
 
 	printf("\nPCB name: %s", elements.str);
 	printf("\nPCB Arrival Time: %d", elements.arrivalTime);
 	printf("\nBurst size: %d", elements.burst);
+	printf("\n Memory Unit size: %d", elements.MemoryUnits);
 	printf("\n");
+}
+
+int visitNodeMemory(PCB elements) {
+	// Declare Structure
+	Results result;
+	
+	// Variable Declarations
+	int fdOUT;
+	result.error = 1;
+	// Send through private FIFO right here
+	fdOUT = open(elements.str, O_WRONLY);             //Open privFIFO
+	write(fdOUT, &result, sizeof(result));          //Write to privFIFO
 }
 
 ///  This function calculates results and sends them
@@ -150,7 +180,7 @@ void visitResultNode(PCB elements) {
 	int burst = elements.burst;
 	int arrivalTime = elements.arrivalTime;
 
-	// Structure declration
+	// Structure declaration
 	Results result;
 
 	// Send information back to the client
@@ -226,9 +256,18 @@ int main(int argc, char *argv[]) {
 
 	// All variables defined and commFIFO open for clients UI & Enqueueing //
 	//User Promts
+	// Prompt for Number of Clients
 	printf("How many clients do you have?: ");
 	scanf("%d", &count);
-
+	// Prompt for Initial Number of Frames
+	printf("What is the initial number of frames: ");
+	scanf("%d", &frames);
+	//Prompt for Size of Frames
+	printf("What is the size of each frame: ");
+	scanf("%d", &frameSize);
+	//Display total number of frames available
+	Memory = frames * frameSize;
+	printf("Available Memory: %d", Memory);
 	// Open common_FIFO to read
 	if ((fdIN = open("common_FIFO", O_RDONLY)) < 0)
 		printf("Can't open common FIFO to read\n");
@@ -242,6 +281,7 @@ int main(int argc, char *argv[]) {
 		printf("The Private FIFO name is %s.\n", process.str);
 		printf("The Prcess burst is: %d\n", process.burst);
 		printf("The Arrival Time is: %d\n", process.arrivalTime);
+		printf("The Memory Units requested is: %d\n", process.MemoryUnits);
 
 		//calculate total burst time
 		b = process.burst;
@@ -263,26 +303,39 @@ int main(int argc, char *argv[]) {
 		printf("\n------- Traversing the queue --------- ");
 		traverseQueue(&Q);
 
+		// Perform Memory Check
+		printf("\n--------- Checking Memory -----------");
+		firstMemory(&Q);
+
 		// Dequeue PCB
+		if (toggle == 1) {
+			printf("Error Memory Could not be allocated to Process");
+			visitNodeMemory(dequeue(&Q));
+			j++;
+			continue;
+		}
 		printf("\n--------- Dequeuing PCB ------------");
 		visitResultNode(dequeue(&Q));
+		toggle == 0;									// Toggle Back to Allow arithmetics
 		j++;
 	}// close return while loop
 
 	// Server Print Statements
 	// Throughput
-	throughput = total / count;					// # of processes per time unit
-	printf("\nThe server completes %d processes in %d ms", count, total);
-	printf("\nThe Throughput: %0.2f", throughput);
-	// CPU Utilization Time
-	cpuUtilization = total / globalClock;
-	printf("\nThe CPU Utilization Time is: %0.2f", cpuUtilization);
-	// Average Turn Around TIme
-	averageTurnAround = averageTurnAround / 3;
-	printf("\nThe Average Turn Around Time is: %0.2f", averageTurnAround);
-	//Average Wait Time
-	averageWaitTime = averageWaitTime / 3;
-	printf("\nThe Average Waiting Time is: %0.2f", averageWaitTime);
+	if (toggle == 0) {
+		throughput = total / count;					// # of processes per time unit
+		printf("\nThe server completes %d processes in %d ms", count, total);
+		printf("\nThe Throughput: %0.2f", throughput);
+		// CPU Utilization Time
+		cpuUtilization = total / globalClock;
+		printf("\nThe CPU Utilization Time is: %0.2f", cpuUtilization);
+		// Average Turn Around TIme
+		averageTurnAround = averageTurnAround / 3;
+		printf("\nThe Average Turn Around Time is: %0.2f", averageTurnAround);
+		//Average Wait Time
+		averageWaitTime = averageWaitTime / 3;
+		printf("\nThe Average Waiting Time is: %0.2f", averageWaitTime);
+	}
 	//Close common_FIFO
 	printf("\n--------------- Done --------------------\n");
 	close(fdIN);
