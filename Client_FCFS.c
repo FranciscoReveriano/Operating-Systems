@@ -8,9 +8,9 @@
 typedef struct values {
 	char str[30];
 	int arrivalTime;
-	int burst;							//used for both the initial size of the process and to send the completion time
+	int burst;						//used for both the initial size of the process and to send the completion time
 	int MemoryUnits;					//used for number of memory units the Process requires
-} Process;								/*Datatype of the elements in the queue*/
+} Process;							/*Datatype of the elements in the queue*/
 
 typedef struct result {
 	int WaitingInReady;
@@ -31,13 +31,13 @@ int main(int argc, char *argv[]) {
 
 	int fdIN;																// to write to character server
 	int fdOUT;																// to read from character server
-	int clientID;															// Get Client ID
+	int clientID;						// Get Client ID
 
 	// Structure Information
 		// Get Client ID
-	clientID = getpid();													// GET ID
+	clientID = getpid();					// GET ID
 	sprintf(process.str, "FIFO_%d", clientID);
-	printf("\nFIFO name is %s ", process.str);								// Print Process Name
+	printf("\nFIFO name is %s ", process.str);		// Print Process Name
 	// Prompt for Arrival time
 	printf("\nEnter Arrival Time: ");
 	scanf("%d", &process.arrivalTime);
